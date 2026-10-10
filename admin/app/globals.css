@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --espresso: #3B1A08;
+    --dark-wood: #1C0D03;
+    --warm-brown: #6B4226;
+    --warm-amber: #C8873F;
+    --warm-amber-hover: #D9974F;
+    --light-caramel: #E8C99A;
+    --cream: #FDF6EE;
+    --cream-card: #F9F1E6;
+    --warm-white: #FFFDFC;
+    --text-dark: #1A0A00;
+    --text-muted: #7A5C44;
+
+    --border-warm: #E2D4C5;
+  }
+}
+
+@theme {
+  --color-espresso: var(--espresso);
+  --color-dark-wood: var(--dark-wood);
+  --color-warm-brown: var(--warm-brown);
+  --color-warm-amber: var(--warm-amber);
+  --color-warm-amber-hover: var(--warm-amber-hover);
+  --color-light-caramel: var(--light-caramel);
+  --color-cream: var(--cream);
+  --color-cream-card: var(--cream-card);
+  --color-warm-white: var(--warm-white);
+  --color-text-dark: var(--text-dark);
+  --color-text-muted: var(--text-muted);
+  --color-border-warm: var(--border-warm);
+
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--cream);
+  color: var(--text-dark);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+h1, h2, h3, .font-serif {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+/* Custom scrollbars for admin dashboard UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cream-card);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--light-caramel);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--warm-amber);
+}
