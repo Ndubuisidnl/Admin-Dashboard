@@ -9,7 +9,7 @@ export default async function AdminDashboardLayout({
   children: React.ReactNode;
 }) {
   // SERVER-SIDE SECURITY CHECK LAYER 2:
-  // Verifies authentic admin token and database profiles.role === 'admin'
+  // Verifies an authenticated staff or admin profile against the shared database.
   const admin = await verifyAdminSession();
 
   return (

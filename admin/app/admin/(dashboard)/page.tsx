@@ -44,7 +44,7 @@ export default async function AdminDashboardOverviewPage() {
               ₦{stats.todayRevenue.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
             </h3>
             <p className="text-[11px] text-emerald-700 font-medium mt-1">
-              From completed today's orders
+              From non-cancelled orders today
             </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-100 text-warm-amber flex items-center justify-center">
@@ -92,7 +92,7 @@ export default async function AdminDashboardOverviewPage() {
         <div className="bg-warm-white p-6 rounded-2xl border border-border-warm shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Unread Messages
+              Contact Messages
             </p>
             <h3 className="text-2xl font-bold text-dark-wood mt-1">
               {stats.unreadMessagesCount}
@@ -270,7 +270,7 @@ export default async function AdminDashboardOverviewPage() {
                     <div className="text-[11px] text-text-muted flex items-center space-x-2">
                       <span className="flex items-center space-x-1 font-medium">
                         <Clock className="w-3 h-3 text-warm-amber" />
-                        <span>{res.time}</span>
+                        <span>{res.reservation_time}</span>
                       </span>
                       {res.occasion && (
                         <span className="capitalize text-warm-brown">

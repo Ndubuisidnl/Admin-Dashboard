@@ -5,7 +5,7 @@ import { ReservationsManagerClient } from "@/components/admin/ReservationsManage
 export const instant = false;
 
 export default async function AdminReservationsPage() {
-  const reservations = await getReservationsAction();
+  const result = await getReservationsAction();
 
-  return <ReservationsManagerClient initialReservations={reservations} />;
+  return <ReservationsManagerClient initialReservations={result.reservations} initialError={result.error} />;
 }

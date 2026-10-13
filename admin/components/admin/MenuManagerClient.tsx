@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useTransition } from "react";
 import { MenuItem, MenuCategory } from "@/lib/types";
@@ -22,17 +22,18 @@ import {
 } from "@/lib/actions/menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { createClient } from "@/lib/supabase/client";
 
 const categories: { label: string; value: MenuCategory | "all" }[] = [
   { label: "All Items", value: "all" },
   { label: "Breakfast", value: "breakfast" },
   { label: "Burgers", value: "burgers" },
   { label: "Sandwiches", value: "sandwiches" },
-  { label: "Starters", value: "starters" },
-  { label: "Salads", value: "salads" },
   { label: "Main Dishes", value: "main-dishes" },
-  { label: "Sides", value: "sides" },
   { label: "Pasta", value: "pasta" },
+  { label: "Rice", value: "rice" },
+  { label: "Chicken", value: "chicken" },
+  { label: "Snacks", value: "snacks" },
   { label: "Coffee", value: "coffee" },
   { label: "Drinks", value: "drinks" },
   { label: "Desserts", value: "desserts" },
@@ -53,6 +54,7 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Filter items
   const filteredItems = items.filter((item) => {
@@ -66,12 +68,14 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
 
   const handleOpenCreateModal = () => {
     setEditingItem(null);
+    setImagePreview(null);
     setFormError(null);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (item: MenuItem) => {
     setEditingItem(item);
+    setImagePreview(item.image_url);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -102,8 +106,44 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
     e.preventDefault();
     setFormError(null);
     const formData = new FormData(e.currentTarget);
+    const imageFile = formData.get("image_file");
+    let uploadedPath: string | null = null;
+
+    if (imageFile instanceof File && imageFile.size > 0) {
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+      if (!allowedTypes.includes(imageFile.type)) {
+        setFormError("Choose a JPG, PNG, WebP, or AVIF image.");
+        return;
+      }
+      if (imageFile.size > 5 * 1024 * 1024) {
+        setFormError("Image files must be 5 MB or smaller.");
+        return;
+      }
+    }
 
     startTransition(async () => {
+      if (imageFile instanceof File && imageFile.size > 0) {
+        const extensions: Record<string, string> = {
+          "image/jpeg": "jpg",
+          "image/png": "png",
+          "image/webp": "webp",
+          "image/avif": "avif",
+        };
+        const supabase = createClient();
+        uploadedPath = `menu-items/${crypto.randomUUID()}.${extensions[imageFile.type]}`;
+        const { error: uploadError } = await supabase.storage
+          .from("menu-images")
+          .upload(uploadedPath, imageFile, { contentType: imageFile.type, upsert: false });
+        if (uploadError) {
+          setFormError(`Image upload failed: ${uploadError.message}`);
+          return;
+        }
+        formData.set("image_url", supabase.storage.from("menu-images").getPublicUrl(uploadedPath).data.publicUrl);
+      } else {
+        formData.set("image_url", editingItem?.image_url || "");
+      }
+      formData.delete("image_file");
+
       let res;
       if (editingItem) {
         res = await updateMenuItemAction(editingItem.id, formData);
@@ -202,13 +242,12 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
               <div>
                 {/* Image Placeholder Banner */}
                 <div className="h-40 bg-cream-card border-b border-border-warm relative flex items-center justify-center overflow-hidden group">
-                  {/* IMAGE: {item.image_label || item.name} */}
-                  <div className="text-center p-4">
+                  {item.image_url ? <img src={item.image_url} alt={item.image_label || item.name} className="h-full w-full object-cover" /> : <div className="text-center p-4">
                     <ImageIcon className="w-8 h-8 text-warm-brown/40 mx-auto mb-1" />
                     <span className="text-[11px] font-medium text-text-muted italic block">
                       {item.image_label || item.name}
                     </span>
-                  </div>
+                  </div>}
 
                   {/* Featured Tag */}
                   {item.featured && (
@@ -234,11 +273,6 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                       <div className="font-bold text-base text-warm-amber">
                         ₦{Number(item.price).toLocaleString("en-NG")}
                       </div>
-                      {item.price_secondary && (
-                        <div className="text-[10px] text-text-muted font-medium">
-                          Large: ₦{Number(item.price_secondary).toLocaleString("en-NG")}
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -251,7 +285,7 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                     {item.preparation_time && (
                       <span className="flex items-center space-x-1 font-medium bg-cream px-2 py-0.5 rounded border border-border-warm">
                         <Clock className="w-3 h-3 text-warm-brown" />
-                        <span>{item.preparation_time}</span>
+                        <span>{item.preparation_time} min</span>
                       </span>
                     )}
                     {item.tags?.map((tag) => (
@@ -304,7 +338,7 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                   <button
                     onClick={() => setItemToDelete(item)}
                     className="p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete Item"
+                    title="Archive Item"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -327,7 +361,7 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                 onClick={() => setIsModalOpen(false)}
                 className="text-cream-card/70 hover:text-white text-sm"
               >
-                ✕
+                âœ•
               </button>
             </div>
 
@@ -382,44 +416,29 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                     Prep Time (Optional)
                   </label>
                   <input
-                    type="text"
+                    type="number"
+                    min="1"
                     name="preparation_time"
                     defaultValue={editingItem?.preparation_time || ""}
-                    placeholder="e.g. 15-20 mins"
+                    placeholder="Minutes"
                     className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs"
                   />
                 </div>
               </div>
-
-              {/* Price Fields */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-text-dark mb-1">
-                    Primary Price (₦) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="price"
-                    required
-                    defaultValue={editingItem?.price || ""}
-                    placeholder="4500.00"
-                    className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-text-dark mb-1">
-                    Secondary Price (Optional ₦)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="price_secondary"
-                    defaultValue={editingItem?.price_secondary || ""}
-                    placeholder="6000.00"
-                    className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs font-mono"
-                  />
-                </div>
+              {/* Price */}
+              <div>
+                <label className="block font-semibold text-text-dark mb-1">
+                  Price (₦) *
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  name="price"
+                  required
+                  defaultValue={editingItem?.price || ""}
+                  placeholder="4500"
+                  className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs font-mono"
+                />
               </div>
 
               {/* Description */}
@@ -437,6 +456,22 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
                 />
               </div>
 
+              {/* Image Upload */}
+              <div>
+                <label className="block font-semibold text-text-dark mb-1">Menu Image</label>
+                <input
+                  type="file"
+                  name="image_file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setImagePreview(file ? URL.createObjectURL(file) : editingItem?.image_url || null);
+                  }}
+                  className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs file:mr-3 file:rounded-md file:border-0 file:bg-warm-amber file:px-3 file:py-1 file:font-semibold"
+                />
+                <p className="mt-1 text-[10px] text-text-muted">JPG, PNG, WebP, or AVIF. Maximum size: 5 MB.</p>
+                {imagePreview && <img src={imagePreview} alt="Menu item preview" className="mt-3 h-28 w-40 rounded-lg border border-border-warm object-cover" />}
+              </div>
               {/* Image Label & Tags */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -519,9 +554,9 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
       {/* Confirm Delete Dialog */}
       <ConfirmDialog
         isOpen={Boolean(itemToDelete)}
-        title="Delete Menu Item"
-        message={`Are you sure you want to delete "${itemToDelete?.name}"? This action cannot be undone.`}
-        confirmText="Delete Item"
+        title="Archive Menu Item"
+        message={`Hide "${itemToDelete?.name}" from the customer menu? It can be restored in the database.`}
+        confirmText="Archive Item"
         isDanger
         isLoading={isPending}
         onConfirm={handleDeleteConfirm}

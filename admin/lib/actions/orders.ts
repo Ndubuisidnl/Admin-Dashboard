@@ -34,7 +34,27 @@ export async function getOrdersAction(
     return [];
   }
 
-  return (data as Order[]) || [];
+  return ((data || []).map(normalizeOrder) as Order[]);
+}
+
+function normalizeOrder(row: any): Order {
+  return {
+    ...row,
+    delivery_address: row.delivery_address
+      ? typeof row.delivery_address === "string"
+        ? { address: row.delivery_address, landmark: row.delivery_landmark || "" }
+        : row.delivery_address
+      : null,
+    items: (row.items || []).map((item: any) => ({
+      ...item,
+      menu_item_snapshot: {
+        id: item.menu_item_id || item.id,
+        name: item.item_name,
+        price: item.unit_price,
+        category: "",
+      },
+    })),
+  };
 }
 
 // SUPABASE: Fetch single order by ID
@@ -51,7 +71,7 @@ export async function getOrderByIdAction(id: string): Promise<Order | null> {
     .single();
 
   if (error || !data) return null;
-  return data as Order;
+  return normalizeOrder(data);
 }
 
 // SUPABASE: Update order status (with automatic timestamp update)
@@ -65,7 +85,6 @@ export async function updateOrderStatusAction(
     .from("orders")
     .update({
       status: newStatus,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", orderId);
 
@@ -78,110 +97,32 @@ export async function updateOrderStatusAction(
   return { success: true };
 }
 
-// SUPABASE & SERVER SECURITY: Secure server-side order creation
-// Crucial: Prices, subtotals, delivery fees, and order numbers are generated SERVER-SIDE ONLY.
+// Orders are placed by the customer site through the trusted place_order RPC.
 export async function createOrderServerSideAction(input: OrderCreationInput) {
   const supabase = await createClient();
-
-  if (!input.items || input.items.length === 0) {
-    return { error: "Order must contain at least one item." };
-  }
-
-  // 1. Fetch real menu item records from database to ensure trusted pricing
-  const itemIds = input.items.map((i) => i.menu_item_id);
-  const { data: dbMenuItems, error: menuError } = await supabase
+  const ids = input.items.map((item) => item.menu_item_id);
+  const { data: menu, error: menuError } = await supabase
     .from("menu_items")
-    .select("id, name, price, category, available, image_label")
-    .in("id", itemIds);
-
-  if (menuError || !dbMenuItems) {
-    return { error: "Failed to validate order menu items." };
-  }
-
-  const menuMap = new Map(dbMenuItems.map((item) => [item.id, item]));
-
-  // 2. Validate availability and calculate trusted subtotal
-  let subtotal = 0;
-  const orderItemsToInsert = [];
-
-  for (const itemInput of input.items) {
-    const menuItem = menuMap.get(itemInput.menu_item_id);
-    if (!menuItem) {
-      return { error: `Item ID ${itemInput.menu_item_id} no longer exists.` };
-    }
-    if (!menuItem.available) {
-      return { error: `"${menuItem.name}" is currently out of stock.` };
-    }
-
-    const unitPrice = Number(menuItem.price);
-    const lineTotal = unitPrice * itemInput.quantity;
-    subtotal += lineTotal;
-
-    orderItemsToInsert.push({
-      menu_item_id: menuItem.id,
-      menu_item_snapshot: {
-        id: menuItem.id,
-        name: menuItem.name,
-        price: unitPrice,
-        category: menuItem.category,
-        image_label: menuItem.image_label,
-      },
-      quantity: itemInput.quantity,
-      unit_price: unitPrice,
-      special_instructions: itemInput.special_instructions || null,
-    });
-  }
-
-  // 3. Determine delivery fee (Server configured)
-  const deliveryFee = input.order_type === "delivery" ? 1500 : 0;
-  const total = subtotal + deliveryFee;
-
-  // 4. Generate server-side sequential order number
-  const timestamp = Date.now().toString().slice(-4);
-  const randomSuffix = Math.floor(100 + Math.random() * 900);
-  const orderNumber = `WH-${timestamp}${randomSuffix}`;
-
-  // 5. Insert order record
-  const { data: newOrder, error: orderInsertError } = await supabase
-    .from("orders")
-    .insert({
-      order_number: orderNumber,
-      user_id: input.user_id || null,
-      full_name: input.full_name,
-      phone: input.phone,
-      email: input.email,
-      order_type: input.order_type,
-      payment_method: input.payment_method,
-      delivery_address: input.delivery_address ? (input.delivery_address as any) : null,
-      general_note: input.general_note || null,
-      subtotal,
-      delivery_fee: deliveryFee,
-      total,
-      status: "received",
-    })
-    .select()
-    .single();
-
-  if (orderInsertError || !newOrder) {
-    return { error: `Failed to create order: ${orderInsertError?.message}` };
-  }
-
-  // 6. Insert order item snapshots
-  const itemsWithOrderId = orderItemsToInsert.map((item) => ({
-    ...item,
-    order_id: newOrder.id,
-  }));
-
-  const { error: itemsInsertError } = await supabase
-    .from("order_items")
-    .insert(itemsWithOrderId);
-
-  if (itemsInsertError) {
-    return { error: `Order created, but items insert failed: ${itemsInsertError.message}` };
-  }
-
+    .select("id, price")
+    .in("id", ids);
+  if (menuError || !menu) return { error: "Could not load current menu prices." };
+  const prices = new Map(menu.map((item) => [item.id, item.price]));
+  const { data, error } = await supabase.rpc("place_order", {
+    p_full_name: input.full_name,
+    p_email: input.email,
+    p_phone: input.phone,
+    p_order_type: input.order_type,
+    p_delivery_address: input.delivery_address?.address || null,
+    p_delivery_landmark: input.delivery_address?.landmark || null,
+    p_payment_method: input.payment_method,
+    p_general_note: input.general_note || "",
+    p_items: input.items.map((item) => ({
+      ...item,
+      selected_unit_price: prices.get(item.menu_item_id),
+    })),
+  });
+  if (error) return { error: `Failed to create order: ${error.message}` };
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
-
-  return { success: true, order: newOrder };
+  return { success: true, order: data?.[0] };
 }

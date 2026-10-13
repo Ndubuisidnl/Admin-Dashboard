@@ -34,10 +34,9 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
     .eq("status", "pending");
 
   // 3. Count Unread Messages
-  const { count: unreadMessagesCount } = await supabase
+  const { count: contactMessagesCount } = await supabase
     .from("contact_messages")
-    .select("*", { count: "exact", head: true })
-    .eq("is_read", false);
+    .select("*", { count: "exact", head: true });
 
   // 4. Fetch 5 Most Recent Orders
   const { data: recentOrders } = await supabase
@@ -51,16 +50,22 @@ export async function getDashboardStatsAction(): Promise<DashboardStats> {
   const { data: todayReservations } = await supabase
     .from("reservations")
     .select("*")
-    .eq("date", todayDateString)
-    .order("time", { ascending: true })
+    .eq("reservation_date", todayDateString)
+    .order("reservation_time", { ascending: true })
     .limit(10);
 
   return {
     todayRevenue,
     todayOrdersCount,
     pendingReservationsCount: pendingReservationsCount || 0,
-    unreadMessagesCount: unreadMessagesCount || 0,
+    unreadMessagesCount: contactMessagesCount || 0,
     recentOrders: (recentOrders as any) || [],
-    todayReservations: (todayReservations as any) || [],
+    todayReservations: (todayReservations || []).map((row) => ({
+      ...row,
+      date: row.reservation_date,
+      time: row.reservation_time,
+      reservation_date: row.reservation_date,
+      reservation_time: row.reservation_time,
+    })) as any,
   };
 }

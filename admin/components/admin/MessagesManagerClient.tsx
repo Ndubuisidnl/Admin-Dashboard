@@ -1,25 +1,16 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState } from "react";
 import { ContactMessage, NewsletterSubscriber } from "@/lib/types";
 import {
   Mail,
-  UserCheck,
   Phone,
-  Trash2,
   CheckCircle2,
-  MailCheck,
   Download,
   Search,
   MessageSquare,
   Users,
 } from "lucide-react";
-import {
-  toggleMessageReadAction,
-  deleteContactMessageAction,
-} from "@/lib/actions/messages";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface MessagesManagerClientProps {
   initialMessages: ContactMessage[];
@@ -31,56 +22,22 @@ export function MessagesManagerClient({
   initialSubscribers,
 }: MessagesManagerClientProps) {
   const [activeTab, setActiveTab] = useState<"inquiries" | "subscribers">("inquiries");
-  const [messages, setMessages] = useState<ContactMessage[]>(initialMessages);
+  const [messages] = useState<ContactMessage[]>(initialMessages);
   const [subscribers] = useState<NewsletterSubscriber[]>(initialSubscribers);
-  const [unreadOnly, setUnreadOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isPending, startTransition] = useTransition();
 
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
-  const [messageToDelete, setMessageToDelete] = useState<ContactMessage | null>(null);
 
   // Filter messages
   const filteredMessages = messages.filter((msg) => {
-    const matchesUnread = !unreadOnly || !msg.is_read;
     const s = searchQuery.toLowerCase();
     const matchesSearch =
       msg.name.toLowerCase().includes(s) ||
       msg.email.toLowerCase().includes(s) ||
       msg.subject.toLowerCase().includes(s) ||
       msg.message.toLowerCase().includes(s);
-    return matchesUnread && matchesSearch;
+    return matchesSearch;
   });
-
-  const handleToggleRead = (msg: ContactMessage) => {
-    startTransition(async () => {
-      const res = await toggleMessageReadAction(msg.id, msg.is_read);
-      if (res.success) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, is_read: !m.is_read } : m))
-        );
-        if (selectedMessage?.id === msg.id) {
-          setSelectedMessage((prev) =>
-            prev ? { ...prev, is_read: !prev.is_read } : null
-          );
-        }
-      }
-    });
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!messageToDelete) return;
-    startTransition(async () => {
-      const res = await deleteContactMessageAction(messageToDelete.id);
-      if (res.success) {
-        setMessages((prev) => prev.filter((m) => m.id !== messageToDelete.id));
-        if (selectedMessage?.id === messageToDelete.id) {
-          setSelectedMessage(null);
-        }
-        setMessageToDelete(null);
-      }
-    });
-  };
 
   const handleExportSubscribersCSV = () => {
     const headers = "Email Address,Subscribed Date\n";
@@ -106,7 +63,7 @@ export function MessagesManagerClient({
             Customer Communications
           </h2>
           <p className="text-xs text-text-muted mt-0.5">
-            Read contact form inquiries and manage your newsletter subscription list.
+            Read contact form inquiries stored in the shared restaurant database.
           </p>
         </div>
 
@@ -121,9 +78,9 @@ export function MessagesManagerClient({
             }`}
           >
             <MessageSquare className="w-4 h-4" />
-            <span>Contact Inquiries ({messages.filter((m) => !m.is_read).length})</span>
+            <span>Contact Inquiries ({messages.length})</span>
           </button>
-          <button
+          {subscribers.length > 0 && <button
             onClick={() => setActiveTab("subscribers")}
             className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center space-x-1.5 ${
               activeTab === "subscribers"
@@ -133,7 +90,7 @@ export function MessagesManagerClient({
           >
             <Users className="w-4 h-4" />
             <span>Newsletter List ({subscribers.length})</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -152,15 +109,6 @@ export function MessagesManagerClient({
               />
             </div>
 
-            <label className="flex items-center space-x-2 cursor-pointer font-semibold text-text-dark">
-              <input
-                type="checkbox"
-                checked={unreadOnly}
-                onChange={(e) => setUnreadOnly(e.target.checked)}
-                className="rounded text-warm-amber"
-              />
-              <span>Show Unread Only</span>
-            </label>
           </div>
 
           {/* Messages List */}
@@ -180,22 +128,13 @@ export function MessagesManagerClient({
                 {filteredMessages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${
-                      !msg.is_read
-                        ? "bg-amber-50/40 font-medium border-l-4 border-l-warm-amber"
-                        : "hover:bg-cream/40"
-                    }`}
+                    className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors hover:bg-cream/40"
                   >
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center space-x-3">
                         <span className="font-bold text-dark-wood text-sm">
                           {msg.name}
                         </span>
-                        {!msg.is_read && (
-                          <span className="px-2 py-0.5 rounded bg-warm-amber text-dark-wood text-[10px] font-bold">
-                            NEW UNREAD
-                          </span>
-                        )}
                         <span className="text-[11px] text-text-muted">
                           {new Date(msg.created_at).toLocaleDateString("en-NG", {
                             month: "short",
@@ -234,24 +173,6 @@ export function MessagesManagerClient({
                         className="px-3 py-1.5 bg-warm-amber/20 hover:bg-warm-amber text-dark-wood font-semibold rounded-lg text-xs transition-colors"
                       >
                         Read Message
-                      </button>
-                      <button
-                        onClick={() => handleToggleRead(msg)}
-                        className={`p-2 rounded-lg text-xs font-semibold border transition-colors ${
-                          msg.is_read
-                            ? "border-border-warm text-text-muted hover:bg-cream"
-                            : "border-warm-amber text-warm-brown hover:bg-amber-100"
-                        }`}
-                        title={msg.is_read ? "Mark Unread" : "Mark Read"}
-                      >
-                        <MailCheck className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setMessageToDelete(msg)}
-                        className="p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Message"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -379,13 +300,6 @@ export function MessagesManagerClient({
               <div className="pt-4 border-t border-border-warm flex justify-between items-center">
                 <button
                   type="button"
-                  onClick={() => handleToggleRead(selectedMessage)}
-                  className="px-3 py-1.5 bg-cream hover:bg-cream-card text-text-dark font-semibold rounded-lg border border-border-warm"
-                >
-                  {selectedMessage.is_read ? "Mark as Unread" : "Mark as Read"}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setSelectedMessage(null)}
                   className="px-5 py-2 bg-dark-wood text-light-caramel font-semibold rounded-lg"
                 >
@@ -397,17 +311,6 @@ export function MessagesManagerClient({
         </div>
       )}
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        isOpen={Boolean(messageToDelete)}
-        title="Delete Contact Message"
-        message={`Are you sure you want to delete this message from ${messageToDelete?.name}?`}
-        confirmText="Delete Message"
-        isDanger
-        isLoading={isPending}
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => setMessageToDelete(null)}
-      />
     </div>
   );
 }

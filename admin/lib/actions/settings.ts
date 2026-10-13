@@ -20,7 +20,32 @@ export async function getAdminProfileAction(): Promise<Profile | null> {
     .eq("id", user.id)
     .single();
 
-  return profile as Profile | null;
+  return profile ? ({ ...profile, email: user.email || null } as Profile) : null;
+}
+
+export async function getRestaurantSettingsAction() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("restaurant_settings")
+    .select("delivery_fee")
+    .eq("id", true)
+    .single();
+  if (error) return { delivery_fee: null };
+  return data;
+}
+
+export async function updateDeliveryFeeAction(formData: FormData) {
+  const supabase = await createClient();
+  const rawFee = formData.get("delivery_fee");
+  const fee = Number(rawFee);
+  if (typeof rawFee !== "string" || rawFee.trim() === "" || !Number.isInteger(fee) || fee < 0) return { error: "Enter a valid non-negative delivery fee." };
+  const { error } = await supabase.from("restaurant_settings").update({
+    delivery_fee: fee,
+    updated_at: new Date().toISOString(),
+  }).eq("id", true);
+  if (error) return { error: `Failed to update delivery fee: ${error.message}` };
+  revalidatePath("/admin/settings");
+  return { success: true };
 }
 
 // SUPABASE: Update admin profile

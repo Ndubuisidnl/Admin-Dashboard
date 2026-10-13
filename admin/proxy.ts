@@ -6,11 +6,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const { supabaseResponse, hasAuthToken } = await updateSession(request);
 
-  // 1. Exclude /admin/login from protection + redirect authenticated users to /admin
+  // Login is available even when a customer session exists; role checks happen after sign-in.
   if (pathname === "/admin/login") {
-    if (hasAuthToken) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
     return supabaseResponse;
   }
 

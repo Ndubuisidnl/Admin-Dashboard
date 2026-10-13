@@ -32,10 +32,12 @@ const reservationStatuses: { label: string; value: ReservationStatus | "all" }[]
 
 interface ReservationsManagerClientProps {
   initialReservations: Reservation[];
+  initialError?: string;
 }
 
 export function ReservationsManagerClient({
   initialReservations,
+  initialError,
 }: ReservationsManagerClientProps) {
   const [reservations, setReservations] = useState<Reservation[]>(initialReservations);
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
@@ -50,7 +52,7 @@ export function ReservationsManagerClient({
   const filteredReservations = reservations.filter((res) => {
     const matchesStatus =
       selectedStatus === "all" || res.status === selectedStatus;
-    const matchesDate = !selectedDate || res.date === selectedDate;
+    const matchesDate = !selectedDate || res.reservation_date === selectedDate;
     return matchesStatus && matchesDate;
   });
 
@@ -128,6 +130,12 @@ export function ReservationsManagerClient({
         </div>
       </div>
 
+      {initialError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-800">
+          Could not load reservations from Supabase: {initialError}
+        </div>
+      )}
+
       {/* Filter Tabs */}
       <div className="flex items-center space-x-2 overflow-x-auto pb-2">
         {reservationStatuses.map((st) => (
@@ -192,7 +200,7 @@ export function ReservationsManagerClient({
                     </td>
                     <td className="py-4 px-6">
                       <div className="font-bold text-dark-wood">
-                        {new Date(res.date).toLocaleDateString("en-NG", {
+                        {new Date(res.reservation_date).toLocaleDateString("en-NG", {
                           weekday: "short",
                           year: "numeric",
                           month: "short",
@@ -201,7 +209,7 @@ export function ReservationsManagerClient({
                       </div>
                       <div className="text-xs text-warm-brown font-semibold flex items-center space-x-1 mt-0.5">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{res.time}</span>
+                        <span>{res.reservation_time}</span>
                       </div>
                     </td>
                     <td className="py-4 px-6">

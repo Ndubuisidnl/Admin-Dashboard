@@ -3,14 +3,16 @@
 export type UserRole = "customer" | "admin";
 
 export type OrderType = "pickup" | "delivery";
-export type PaymentMethod = "card" | "cash" | "online";
+export type PaymentMethod = "pay-on-delivery" | "pay-on-pickup" | "pay-at-restaurant";
 
 export type OrderStatus =
   | "received"
   | "preparing"
   | "ready"
+  | "ready-for-pickup"
   | "out-for-delivery"
   | "collected"
+  | "delivered"
   | "cancelled";
 
 export type ReservationStatus =
@@ -23,11 +25,11 @@ export type MenuCategory =
   | "breakfast"
   | "burgers"
   | "sandwiches"
-  | "starters"
-  | "salads"
   | "main-dishes"
-  | "sides"
   | "pasta"
+  | "rice"
+  | "chicken"
+  | "snacks"
   | "coffee"
   | "drinks"
   | "desserts";
@@ -38,7 +40,6 @@ export interface Profile {
   email: string | null;
   phone: string | null;
   role: UserRole;
-  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,15 +49,14 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
-  price_secondary: number | null;
-  price_display: string | null;
   category: MenuCategory;
   image_url: string | null;
-  image_label: string | null;
+  image_label: string;
   available: boolean;
   featured: boolean;
   tags: string[];
-  preparation_time: string | null;
+  preparation_time: number | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -80,7 +80,7 @@ export interface MenuItemSnapshot {
 export interface OrderItem {
   id: string;
   order_id: string;
-  menu_item_id: string;
+  menu_item_id: string | null;
   menu_item_snapshot: MenuItemSnapshot;
   quantity: number;
   unit_price: number;
@@ -99,11 +99,10 @@ export interface Order {
   delivery_address: DeliveryAddress | null;
   general_note: string | null;
   subtotal: number;
-  delivery_fee: number;
+  delivery_fee: number | null;
   total: number;
   status: OrderStatus;
   created_at: string;
-  updated_at: string;
   items?: OrderItem[];
 }
 
@@ -113,14 +112,13 @@ export interface Reservation {
   full_name: string;
   email: string;
   phone: string;
-  date: string;
-  time: string;
+  reservation_date: string;
+  reservation_time: string;
   guest_count: number;
-  occasion: string | null;
-  special_requests: string | null;
+  occasion: string;
+  special_requests: string;
   status: ReservationStatus;
   created_at: string;
-  updated_at: string;
 }
 
 export interface ContactMessage {
@@ -130,7 +128,6 @@ export interface ContactMessage {
   phone: string | null;
   subject: string;
   message: string;
-  is_read: boolean;
   created_at: string;
 }
 

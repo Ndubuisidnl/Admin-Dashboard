@@ -26,7 +26,7 @@ export async function verifyAdminSession(): Promise<AdminUser> {
   // 2. Fetch user profile and verify admin role from database
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, email, role")
+    .select("id, full_name, role")
     .eq("id", user.id)
     .single();
 
@@ -37,7 +37,7 @@ export async function verifyAdminSession(): Promise<AdminUser> {
 
   return {
     id: profile.id,
-    email: profile.email || user.email || "",
+    email: user.email || "",
     full_name: profile.full_name || "Admin",
     role: "admin",
   };

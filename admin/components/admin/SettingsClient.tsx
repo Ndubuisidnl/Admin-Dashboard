@@ -16,14 +16,15 @@ import {
   Clock,
   DollarSign,
 } from "lucide-react";
-import { updateAdminProfileAction } from "@/lib/actions/settings";
+import { updateAdminProfileAction, updateDeliveryFeeAction } from "@/lib/actions/settings";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface SettingsClientProps {
   initialProfile: Profile | null;
+  initialDeliveryFee: number | null;
 }
 
-export function SettingsClient({ initialProfile }: SettingsClientProps) {
+export function SettingsClient({ initialProfile, initialDeliveryFee }: SettingsClientProps) {
   const [activeTab, setActiveTab] = useState<"profile" | "restaurant" | "database">("profile");
   const [profile, setProfile] = useState<Profile | null>(initialProfile);
   const [isPending, startTransition] = useTransition();
@@ -32,7 +33,7 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Store operational state (local editable settings)
-  const [deliveryFee, setDeliveryFee] = useState("1500");
+  const [deliveryFee, setDeliveryFee] = useState(String(initialDeliveryFee ?? ""));
   const [openingHours, setOpeningHours] = useState("8:00 AM – 10:00 PM (Daily)");
   const [storePhone, setStorePhone] = useState("+234 812 345 6789");
   const [storeAddress, setStoreAddress] = useState("Wood House Cafe, Port Harcourt, Rivers State");
@@ -62,9 +63,17 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
     });
   };
 
-  const handleStoreSubmit = (e: React.FormEvent) => {
+  const handleStoreSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setFormSuccess("Restaurant operational settings saved.");
+    setFormSuccess(null);
+    setFormError(null);
+    const formData = new FormData();
+    formData.set("delivery_fee", deliveryFee);
+    startTransition(async () => {
+      const result = await updateDeliveryFeeAction(formData);
+      if (result.error) setFormError(result.error);
+      else setFormSuccess("Delivery fee saved to the shared restaurant settings.");
+    });
   };
 
   return (
@@ -232,7 +241,7 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
                 Wood House Cafe Defaults
               </h3>
               <p className="text-xs text-text-muted">
-                Operating rules applied to customer delivery charges and restaurant schedules.
+                The delivery fee is shared with checkout through restaurant_settings.
               </p>
             </div>
           </div>
@@ -246,6 +255,9 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
                 <DollarSign className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="number"
+                  min="0"
+                  step="1"
+                  required
                   value={deliveryFee}
                   onChange={(e) => setDeliveryFee(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-cream border border-border-warm rounded-lg text-xs font-mono font-bold"
@@ -258,12 +270,13 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
 
             <div>
               <label className="block font-semibold text-text-dark mb-1">
-                Opening Hours
+                Opening Hours (not stored in the shared database)
               </label>
               <div className="relative">
                 <Clock className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
+                  disabled
                   value={openingHours}
                   onChange={(e) => setOpeningHours(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-cream border border-border-warm rounded-lg text-xs"
@@ -273,12 +286,13 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
 
             <div>
               <label className="block font-semibold text-text-dark mb-1">
-                Restaurant Support Line
+                Restaurant Support Line (not stored in the shared database)
               </label>
               <div className="relative">
                 <Phone className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
+                  disabled
                   value={storePhone}
                   onChange={(e) => setStorePhone(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-cream border border-border-warm rounded-lg text-xs"
@@ -288,12 +302,13 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
 
             <div>
               <label className="block font-semibold text-text-dark mb-1">
-                Cafe Location Address
+                Cafe Location Address (not stored in the shared database)
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
+                  disabled
                   value={storeAddress}
                   onChange={(e) => setStoreAddress(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-cream border border-border-warm rounded-lg text-xs"
@@ -307,7 +322,7 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
                 className="px-5 py-2.5 bg-warm-amber hover:bg-warm-amber-hover text-dark-wood font-semibold rounded-lg text-xs shadow-xs flex items-center space-x-2"
               >
                 <Save className="w-4 h-4" />
-                <span>Save Store Defaults</span>
+                <span>Save Delivery Fee</span>
               </button>
             </div>
           </form>
@@ -334,16 +349,16 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
           <div className="space-y-4 text-xs">
             <div className="p-4 bg-cream rounded-xl border border-border-warm space-y-3">
               <h4 className="font-bold text-dark-wood text-sm flex items-center space-x-2">
-                <span>Step 1: Execute Database Migration</span>
+                <span>Step 1: Apply the Restaurant Database Migrations</span>
               </h4>
               <p className="text-text-muted leading-relaxed">
-                Open your Supabase project SQL Editor and paste the complete migration script prepared in this repository artifact:
+                Open the shared Supabase project's SQL Editor and run the restaurant project's initial schema migration, followed by the role migration:
               </p>
               <div className="p-3 bg-dark-wood text-light-caramel rounded-lg font-mono text-[11px] select-all overflow-x-auto">
-                supabase_schema.sql
+                supabase/migrations/202610070001_initial_schema.sql<br />supabase/migrations/202610130001_profiles_role.sql<br />supabase/migrations/202610140001_menu_image_storage.sql<br />supabase/migrations/202610140002_menu_image_upload_policy.sql<br />supabase/migrations/202610140003_admin_menu_item_permissions.sql<br />supabase/migrations/202610140004_admin_reservation_access.sql
               </div>
               <p className="text-[11px] text-text-muted">
-                This script creates all 9 tables (`profiles`, `addresses`, `menu_items`, `favorites`, `orders`, `order_items`, `reservations`, `contact_messages`, `newsletter_subscribers`), the `is_admin()` SQL security function, automatic profile triggers, and RLS policies.
+                Apply the restaurant project's initial schema migration, then its role, menu image storage, and admin access migrations. These migrations create the public `menu-images` bucket and grant admin profiles access to menu editing and reservation management.
               </p>
             </div>
 
@@ -355,7 +370,7 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
                 After signing up your staff email account in Supabase Auth, run this query in the SQL Editor to grant admin privileges:
               </p>
               <div className="p-3 bg-dark-wood text-light-caramel rounded-lg font-mono text-[11px] select-all">
-                UPDATE public.profiles SET role = 'admin' WHERE email = 'your-staff-email@example.com';
+                UPDATE public.profiles p SET role = 'admin' FROM auth.users u WHERE p.id = u.id AND u.email = 'your-staff-email@example.com';
               </div>
             </div>
 
@@ -365,9 +380,8 @@ export function SettingsClient({ initialProfile }: SettingsClientProps) {
               </h4>
               <ul className="list-disc pl-4 text-amber-800 space-y-1 text-[11px]">
                 <li>Proxy optimistic session checks protect `/admin/*` routes (`proxy.ts`).</li>
-                <li>Layout Server Components verify database `profiles.role === 'admin'`.</li>
-                <li>Server Actions independently re-check authentication before any database write.</li>
-                <li>Row Level Security (RLS) policies enforce database-level access rules.</li>
+                <li>Admin pages and sign-in verify the shared `profiles.role = 'admin'` value.</li>
+                <li>Supabase Row Level Security policies check the admin role for protected database operations.</li>
               </ul>
             </div>
           </div>

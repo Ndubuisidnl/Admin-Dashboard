@@ -30,7 +30,11 @@ export async function getMenuItemsAction(
     return [];
   }
 
-  return (data as MenuItem[]) || [];
+  return ((data || []).map((item) => ({
+    ...item,
+    image_url: item.image,
+    preparation_time: item.preparation_time,
+  })) as MenuItem[]);
 }
 
 // SUPABASE: Create new menu item (price validated server-side)
@@ -40,20 +44,19 @@ export async function createMenuItemAction(formData: FormData) {
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
   const price = parseFloat(formData.get("price") as string);
-  const priceSecondaryRaw = formData.get("price_secondary") as string;
-  const price_secondary = priceSecondaryRaw ? parseFloat(priceSecondaryRaw) : null;
-  const price_display = (formData.get("price_display") as string) || null;
   const category = formData.get("category") as MenuCategory;
-  const image_label = (formData.get("image_label") as string) || null;
+  const image_label = (formData.get("image_label") as string) || "";
   const available = formData.get("available") === "true";
   const featured = formData.get("featured") === "true";
-  const preparation_time = (formData.get("preparation_time") as string) || null;
+  const preparationTimeRaw = formData.get("preparation_time") as string;
+  const preparation_time = preparationTimeRaw ? Number(preparationTimeRaw) : null;
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw
     ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  if (!name || !description || isNaN(price) || !category) {
+  if (!name || !description || !Number.isInteger(price) || price < 0 || !category ||
+      (preparation_time !== null && (!Number.isInteger(preparation_time) || preparation_time <= 0))) {
     return { error: "Please fill in all required menu item fields correctly." };
   }
 
@@ -61,14 +64,14 @@ export async function createMenuItemAction(formData: FormData) {
     name,
     description,
     price,
-    price_secondary,
-    price_display,
     category,
     image_label,
+    image: (formData.get("image_url") as string) || null,
     available,
     featured,
     tags,
     preparation_time,
+    is_active: true,
   });
 
   if (error) {
@@ -86,20 +89,19 @@ export async function updateMenuItemAction(id: string, formData: FormData) {
   const name = formData.get("name") as string;
   const description = formData.get("description") as string;
   const price = parseFloat(formData.get("price") as string);
-  const priceSecondaryRaw = formData.get("price_secondary") as string;
-  const price_secondary = priceSecondaryRaw ? parseFloat(priceSecondaryRaw) : null;
-  const price_display = (formData.get("price_display") as string) || null;
   const category = formData.get("category") as MenuCategory;
-  const image_label = (formData.get("image_label") as string) || null;
+  const image_label = (formData.get("image_label") as string) || "";
   const available = formData.get("available") === "true";
   const featured = formData.get("featured") === "true";
-  const preparation_time = (formData.get("preparation_time") as string) || null;
+  const preparationTimeRaw = formData.get("preparation_time") as string;
+  const preparation_time = preparationTimeRaw ? Number(preparationTimeRaw) : null;
   const tagsRaw = formData.get("tags") as string;
   const tags = tagsRaw
     ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
 
-  if (!name || !description || isNaN(price) || !category) {
+  if (!name || !description || !Number.isInteger(price) || price < 0 || !category ||
+      (preparation_time !== null && (!Number.isInteger(preparation_time) || preparation_time <= 0))) {
     return { error: "Please fill in all required menu item fields correctly." };
   }
 
@@ -109,14 +111,14 @@ export async function updateMenuItemAction(id: string, formData: FormData) {
       name,
       description,
       price,
-      price_secondary,
-      price_display,
       category,
       image_label,
+      image: (formData.get("image_url") as string) || null,
       available,
       featured,
       tags,
       preparation_time,
+      is_active: formData.get("is_active") !== "false",
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -152,14 +154,17 @@ export async function toggleMenuItemAvailabilityAction(
   return { success: true };
 }
 
-// SUPABASE: Delete menu item permanently
+// Hide a menu item from the customer site while preserving order history.
 export async function deleteMenuItemAction(id: string) {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("menu_items").delete().eq("id", id);
+  const { error } = await supabase
+    .from("menu_items")
+    .update({ is_active: false, available: false })
+    .eq("id", id);
 
   if (error) {
-    return { error: `Failed to delete menu item: ${error.message}` };
+    return { error: `Failed to archive menu item: ${error.message}` };
   }
 
   revalidatePath("/admin/menu");

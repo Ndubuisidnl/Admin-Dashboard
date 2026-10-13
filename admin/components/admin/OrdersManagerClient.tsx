@@ -28,8 +28,10 @@ const orderStatuses: { label: string; value: OrderStatus | "all" }[] = [
   { label: "Received", value: "received" },
   { label: "Preparing", value: "preparing" },
   { label: "Ready", value: "ready" },
+  { label: "Ready for Pickup", value: "ready-for-pickup" },
   { label: "Out for Delivery", value: "out-for-delivery" },
   { label: "Collected / Delivered", value: "collected" },
+  { label: "Delivered", value: "delivered" },
   { label: "Cancelled", value: "cancelled" },
 ];
 
@@ -121,7 +123,7 @@ export function OrdersManagerClient({
       phone: formData.get("phone") as string,
       email: formData.get("email") as string,
       order_type,
-      payment_method: formData.get("payment_method") as "cash" | "card" | "online",
+      payment_method: formData.get("payment_method") as "pay-on-delivery" | "pay-on-pickup" | "pay-at-restaurant",
       general_note: (formData.get("general_note") as string) || null,
       delivery_address:
         order_type === "delivery"
@@ -534,9 +536,9 @@ export function OrdersManagerClient({
                     required
                     className="w-full px-3 py-2 bg-cream border border-border-warm rounded-lg text-xs"
                   >
-                    <option value="cash">Cash on Hand</option>
-                    <option value="card">POS Card</option>
-                    <option value="online">Online Transfer</option>
+                    <option value="pay-on-delivery">Pay on Delivery</option>
+                    <option value="pay-on-pickup">Pay on Pickup</option>
+                    <option value="pay-at-restaurant">Pay at Restaurant</option>
                   </select>
                 </div>
               </div>

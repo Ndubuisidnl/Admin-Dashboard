@@ -8,30 +8,30 @@ import { revalidatePath } from "next/cache";
 export async function getReservationsAction(
   status?: string,
   date?: string
-): Promise<Reservation[]> {
+): Promise<{ reservations: Reservation[]; error?: string }> {
   const supabase = await createClient();
 
   let query = supabase
     .from("reservations")
     .select("*")
-    .order("date", { ascending: true })
-    .order("time", { ascending: true });
+    .order("reservation_date", { ascending: true })
+    .order("reservation_time", { ascending: true });
 
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
 
   if (date) {
-    query = query.eq("date", date);
+    query = query.eq("reservation_date", date);
   }
 
   const { data, error } = await query;
   if (error) {
     console.error("Error fetching reservations:", error.message);
-    return [];
+    return { reservations: [], error: error.message };
   }
 
-  return (data as Reservation[]) || [];
+  return { reservations: (data as Reservation[]) || [] };
 }
 
 // SUPABASE: Update reservation status (pending -> confirmed -> completed/cancelled)
@@ -45,7 +45,6 @@ export async function updateReservationStatusAction(
     .from("reservations")
     .update({
       status: newStatus,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", id);
 
@@ -79,8 +78,8 @@ export async function createReservationServerSideAction(formData: FormData) {
     full_name,
     email,
     phone,
-    date,
-    time,
+    reservation_date: date,
+    reservation_time: time,
     guest_count,
     occasion,
     special_requests,
