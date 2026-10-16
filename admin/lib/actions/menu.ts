@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { MenuItem, MenuCategory } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { cafeMenu } from "@/lib/menu-data";
 
 // SUPABASE: Fetch menu items with optional category filtering and search query
 export async function getMenuItemsAction(
@@ -35,6 +36,57 @@ export async function getMenuItemsAction(
     image_url: item.image,
     preparation_time: item.preparation_time,
   })) as MenuItem[]);
+}
+
+// Add the photographed reference menu to the shared menu catalog. Existing names
+// are left untouched so running the import again is safe.
+export async function importReferenceMenuAction() {
+  const supabase = await createClient();
+  const { data: existing, error: readError } = await supabase
+    .from("menu_items")
+    .select("name");
+
+  if (readError) return { error: `Could not check the current menu: ${readError.message}` };
+
+  const existingNames = new Set((existing || []).map((item) => item.name.trim().toLocaleLowerCase()));
+  const categoryBySection: Record<string, MenuCategory> = {
+    breakfast: "breakfast",
+    starters: "snacks",
+    sides: "rice",
+    salads: "snacks",
+    mains: "main-dishes",
+    pasta: "pasta",
+    sandwiches: "sandwiches",
+    burgers: "burgers",
+    "coffee-tea": "coffee",
+    drinks: "drinks",
+  };
+
+  const rows = cafeMenu.flatMap((section) => section.items
+    .filter((item) => Number.isInteger(item.price) && !existingNames.has(item.name.trim().toLocaleLowerCase()))
+    .map((item) => ({
+      name: item.name,
+      description: item.description || "",
+      price: item.price!,
+      category: categoryBySection[section.id],
+      image_label: "",
+      image: null,
+      available: true,
+      featured: false,
+      tags: [],
+      preparation_time: null,
+      is_active: true,
+    })));
+
+  const pricedItemCount = cafeMenu.reduce((count, section) => count + section.items.filter((item) => Number.isInteger(item.price)).length, 0);
+  const skipped = pricedItemCount - rows.length;
+  if (rows.length === 0) return { success: true, added: 0, skipped };
+
+  const { error } = await supabase.from("menu_items").insert(rows);
+  if (error) return { error: `Could not import the reference menu: ${error.message}` };
+
+  revalidatePath("/admin/menu");
+  return { success: true, added: rows.length, skipped };
 }
 
 // SUPABASE: Create new menu item (price validated server-side)

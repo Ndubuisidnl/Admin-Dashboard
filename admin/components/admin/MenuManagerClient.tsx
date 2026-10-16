@@ -13,12 +13,14 @@ import {
   Clock,
   Image as ImageIcon,
   Sparkles,
+  Download,
 } from "lucide-react";
 import {
   createMenuItemAction,
   updateMenuItemAction,
   toggleMenuItemAvailabilityAction,
   deleteMenuItemAction,
+  importReferenceMenuAction,
 } from "@/lib/actions/menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -55,6 +57,7 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
   const [itemToDelete, setItemToDelete] = useState<MenuItem | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
 
   // Filter items
   const filteredItems = items.filter((item) => {
@@ -99,6 +102,21 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
         setItems((prev) => prev.filter((i) => i.id !== itemToDelete.id));
         setItemToDelete(null);
       }
+    });
+  };
+
+  const handleImportReferenceMenu = () => {
+    setImportMessage(null);
+    startTransition(async () => {
+      const result = await importReferenceMenuAction();
+      if (result.error) {
+        setImportMessage(result.error);
+        return;
+      }
+      setImportMessage(result.added
+        ? `Added ${result.added} menu items. ${result.skipped} existing items were left unchanged.`
+        : "All reference menu items are already in the catalog.");
+      window.location.reload();
     });
   };
 
@@ -174,7 +192,15 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleImportReferenceMenu}
+            disabled={isPending}
+            className="px-4 py-2 bg-cream hover:bg-cream-card text-dark-wood border border-border-warm font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-60"
+          >
+            <Download className="w-4 h-4" />
+            <span>Import Photo Menu</span>
+          </button>
           {/* Search Input */}
           <div className="relative">
             <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
@@ -197,6 +223,8 @@ export function MenuManagerClient({ initialItems }: MenuManagerClientProps) {
           </button>
         </div>
       </div>
+
+      {importMessage && <p role="status" className="rounded-xl border border-border-warm bg-warm-white px-4 py-3 text-sm text-text-dark">{importMessage}</p>}
 
       {/* Category Pills Filter */}
       <div className="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
